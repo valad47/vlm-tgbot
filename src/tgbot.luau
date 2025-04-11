@@ -5,7 +5,7 @@ local task = require("task")
 local io = require("io")
 local tgbot = {}
 
---task.setdebug()
+task.setdebug()
 
 local bot_token
 local TG_API = "https://api.telegram.org"
@@ -39,10 +39,11 @@ function tgbot.GetMe(): string
     return body
 end
 
-function tgbot.SendMessage(chat_id: number, text: string, parse_mode: string?)
+function tgbot.SendMessage(chat_id: number, text: string, parse_mode: string?, reply_to: number?)
     local ok, response = Post("sendMessage", {chat_id = chat_id,
                           text = text,
-                          parse_mode = parse_mode
+                          parse_mode = parse_mode,
+                          reply_parameters = if reply_to then {message_id = reply_to} else nil
     })
     if not ok or not response.ok then
         print(`[{response.error_code}] Error: {response.description or response}`)
@@ -59,20 +60,29 @@ end
 
 function tgbot.StartLoop(): ()
     print("Starting loop")
+
+    Post("deleteMyCommands", {})
+    local list = {}
+    for i, v in callbacks do
+       table.insert(list, {command = i, description = i})
+    end
+    Post("setMyCommands", {commands = list})
+
     task.spawn(function()
-        while task.wait(1) do
+        while task.wait(.1) do
             local update_id = tonumber(io.ReadFile("update.id")) or 0
-            local ok, ret = Post("getUpdates", {offset = update_id+1, allowed_updates = {"message"}})
+            local ok, ret = Post("getUpdates", {offset = update_id+1})
 
             if not ok then
                 print(`[ERROR]: {ret}`)
                 continue
             else
                 for i,v in ret.result do
-                    if(update_id < v.update_id) then update_id = v.update_id end
+                   if(update_id < v.update_id) then update_id = v.update_id end
+                   print(update_id)
 
                     local arg = if v.message.text then v.message.text:split(" ")[1] else ""
-                    if callbacks[arg] then callbacks[arg](v); continue end
+                       if callbacks[arg:split("@")[1]:split("/")[2]] then callbacks[arg:split("@")[1]:split("/")[2]](v); continue end
                     if all_callback then all_callback(v); continue end
                 end
 
