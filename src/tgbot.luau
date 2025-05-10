@@ -77,13 +77,13 @@ local function Post(method: string, data: {[string]: any}, headers: {}?): string
     end)
 end
 
-local function PostFile(method: string, data, headers, files)
+local function PostFile(method: string, data, files)
     if(not bot_token) then
         error("Bot token was not providen, please use tgbot.SetToken() to do so.")
     end
     return pcall(function()
         local headers, body = network.RequestPostForm(`{TG_API}/bot{bot_token}/{method}`,
-        headers or {}, files or {})
+        data or {}, files or {})
 
         return json.decode(body)
     end)
@@ -96,8 +96,8 @@ function tgbot.Method(method_name: string, body: {any}, headers)
     return response.result
 end
 
-function tgbot.MethodFile(method_name: string, body: {any}, headers, files)
-    local ok, response = PostFile(method_name, body, headers, files)
+function tgbot.MethodFile(method_name: string, body: {any}, files)
+    local ok, response = PostFile(method_name, body, files)
     if not ok or not response.ok then
         print(`[{response.error_code}] Error: {response.description or response}`)
     end
@@ -132,7 +132,7 @@ function tgbot.EditMessageText(chat_id: number, message_id: number, text: string
 end
 
 function tgbot.SendPhoto(chat_id, photo)
-    return tgbot.MethodFile("sendPhoto", {chat_id = chat_id}, nil, {photo = photo})
+    return tgbot.MethodFile("sendPhoto", {chat_id = chat_id}, {photo = photo})
 end
 
 function tgbot.ApproveChatJoinRequest(chat_id: number, user_id: number)
