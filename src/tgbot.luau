@@ -1,7 +1,7 @@
-local network = require("network")
-local json = require("json")
-local task = require("task")
-local io = require("io")
+local network = require_shared("network")
+local json = require_shared("json")
+local task = require_shared("task")
+local io = require_shared("io")
 local tgbot = {}
 
 --task.setdebug()
@@ -66,7 +66,7 @@ local function Get(method: string): string
     return pcall(network.RequestGet, `{TG_API}/bot{bot_token}/{method}`, {"Content-Type: application/json"})
 end
 
-local function Post(method: sting, data: {[string]: any}, headers: {}?): string
+local function Post(method: string, data: {[string]: any}, headers: {}?): string
     if(not bot_token) then
         error("Bot token was not providen, please use tgbot.SetToken() to do so.")
     end
@@ -75,6 +75,33 @@ local function Post(method: sting, data: {[string]: any}, headers: {}?): string
 
         return json.decode(body)
     end)
+end
+
+local function PostFile(method: string, data, headers, files)
+    if(not bot_token) then
+        error("Bot token was not providen, please use tgbot.SetToken() to do so.")
+    end
+    return pcall(function()
+        local headers, body = network.RequestPostForm(`{TG_API}/bot{bot_token}/{method}`,
+        headers or {}, files or {})
+
+        return json.decode(body)
+    end)
+end
+function tgbot.Method(method_name: string, body: {any}, headers)
+    local ok, response = Post(method_name, body, headers)
+    if not ok or not response.ok then
+        print(`[{response.error_code}] Error: {response.description or response}`)
+    end
+    return response.result
+end
+
+function tgbot.MethodFile(method_name: string, body: {any}, headers, files)
+    local ok, response = PostFile(method_name, body, headers, files)
+    if not ok or not response.ok then
+        print(`[{response.error_code}] Error: {response.description or response}`)
+    end
+    return response.result
 end
 
 function tgbot.SetToken(token: string): ()
@@ -87,38 +114,32 @@ function tgbot.GetMe(): string
 end
 
 function tgbot.SendMessage(chat_id: number, text: string, parse_mode: string?, reply_to: number?, replymarkup)
-    local ok, response = Post("sendMessage", {chat_id = chat_id,
+    return tgbot.Method("sendMessage", {chat_id = chat_id,
                           text = text,
                           parse_mode = parse_mode,
                           reply_parameters = if reply_to then {message_id = reply_to} else nil,
                           reply_markup = replymarkup
     })
-    if not ok or not response.ok then
-        print(`[{response.error_code}] Error: {response.description or response}`)
-    end
-    return response.result
 end
 
 function tgbot.EditMessageText(chat_id: number, message_id: number, text: string, parse_mode: string?)
-    local ok, response = Post("editMessageText", {
+    return tgbot.Method("editMessageText", {
                           chat_id = chat_id,
                           message_id = message_id,
                           text = text,
                           parse_mode = parse_mode
     })
-    if not ok or not response.ok then
-        print(`[{response.error_code}] Error: {response.description or response}`)
-    end
-    return response.result
 end
 
-function tgbot.SendPhoto(chat_id: number, photo: string)
-   local headers, body = network.RequestPostForm(`{TG_API}/bot{bot_token}/sendPhoto`,
-   {chat_id = chat_id}, {photo = photo})
-   local response = json.decode(body)
-    if not response.ok then
-        print(`[{response.error_code}] Error: {response.description or response}`)
-    end
+function tgbot.SendPhoto(chat_id, photo)
+    return tgbot.MethodFile("sendPhoto", {chat_id = chat_id}, nil, {photo = photo})
+end
+
+function tgbot.ApproveChatJoinRequest(chat_id: number, user_id: number)
+    return tgbot.Method("approveChatJoinRequest", {
+                              chat_id = chat_id,
+                              user_id = user_id
+    })
 end
 
 function tgbot.AddCommand(command: string, func: (message: {}) -> ())
@@ -153,10 +174,11 @@ function tgbot.StartLoop(): ()
                    if(update_id < v.update_id) then update_id = v.update_id end
                    print(update_id)
 
-                   if not v.message then continue end
+                   if v.message then
                    
                    local arg = if v.message.text then v.message.text:split(" ")[1] else ""
                        if callbacks[arg:split("@")[1]:split("/")[2]] then task.spawn(function() callbacks[arg:split("@")[1]:split("/")[2]](v) end); continue end
+                    end
                     if all_callback then task.spawn(function() all_callback(v) end); continue end
                 end
 
