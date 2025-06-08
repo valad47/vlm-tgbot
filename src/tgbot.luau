@@ -4,52 +4,6 @@ local task = require_shared("task")
 local io = require_shared("io")
 local tgbot = {}
 
---task.setdebug()
-
---[[TYPES]]
-
-type Chat = {
-
-}
-
-type User = {
-
-}
-
-type Message = {
-     message_id: number,
-     message_thread_id: number?,
-     from: User?,
-     sender_chat: Chat?,
-     sender_boost_count: number?,
-     sender_business_bot: User?,
-     date: number,
-     business_connection_id: string?,
-     chat: Chat,
---   forward_origin: MessageOrigin,
-     is_topic_message: boolean?,
-     is_automatic_forward: boolean?,
-     reply_to_message: Message?,
---   external_reply: ExternalReplyInfo,
---     quote: TextQuote?,
---     reply_to_story: Story?
---     via_bot: Story?,
-     edit_date: number?,
-     has_protected_content: boolean?,
-     is_from_offline: boolean?,
-     media_group_id: string?,
-     author_signature: string?,
-     text: string,
---     entities: {MessageEntity}?,
---     link_preview_options: LinkPreviewOptions?
-}
-
-type Update = {
-
-}
-
---[[TYPES]]
-
 function tgbot.__set_task(new_task)
     task = new_task
 end
@@ -88,12 +42,18 @@ local function PostFile(method: string, data, files)
         return json.decode(body)
     end)
 end
+
 function tgbot.Method(method_name: string, body: {any}, headers)
     local ok, response = Post(method_name, body, headers)
     if not ok or not response.ok then
         print(`[{response.error_code}] Error: {response.description or response}`)
     end
     return response.result
+end
+
+function tgbot._AsyncNoRet()
+    local method = tgbot.Method
+    tgbot.Method = function(a, b, c) task.truethread(function() method(a, b, c) end) end
 end
 
 function tgbot.MethodFile(method_name: string, body: {any}, files)
@@ -142,8 +102,8 @@ function tgbot.ApproveChatJoinRequest(chat_id: number, user_id: number)
     })
 end
 
-function tgbot.AddCommand(command: string, func: (message: {}) -> ())
-    callbacks[command] = func
+function tgbot.AddCommand(command: string, func: (message: {}) -> (), desc: string?)
+    callbacks[command] = {func = func, desc = desc}
 end
 
 function tgbot.SetTextHandler(func)
@@ -156,7 +116,7 @@ function tgbot.StartLoop(): ()
     Post("deleteMyCommands", {})
     local list = {}
     for i, v in callbacks do
-       table.insert(list, {command = i, description = i})
+       table.insert(list, {command = i, description = v.desc or i})
     end
     Post("setMyCommands", {commands = list})
 
@@ -177,7 +137,7 @@ function tgbot.StartLoop(): ()
                    if v.message then
                    
                    local arg = if v.message.text then v.message.text:split(" ")[1] else ""
-                       if callbacks[arg:split("@")[1]:split("/")[2]] then task.spawn(function() callbacks[arg:split("@")[1]:split("/")[2]](v) end); continue end
+                       if callbacks[arg:split("@")[1]:split("/")[2]] then task.spawn(function() callbacks[arg:split("@")[1]:split("/")[2]].func(v) end); continue end
                     end
                     if all_callback then task.spawn(function() all_callback(v) end); continue end
                 end
