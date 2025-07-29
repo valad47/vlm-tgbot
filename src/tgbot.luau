@@ -2,6 +2,7 @@ local network = require_shared("network")
 local json = require_shared("json")
 local task = require_shared("task")
 local io = require_shared("io")
+local color = require_shared("color")
 local tgbot = {}
 
 function tgbot.__set_task(new_task)
@@ -12,20 +13,21 @@ local bot_token
 local TG_API = "https://api.telegram.org"
 local callbacks = {}
 local all_callback
+local botname
 
-local function Get(method: string): string
+local function Get(method: string): string | boolean
     if(not bot_token) then
         error("Bot token was not providen, please use tgbot.SetToken() to do so.")
     end
     return pcall(network.RequestGet, `{TG_API}/bot{bot_token}/{method}`, {"Content-Type: application/json"})
 end
 
-local function Post(method: string, data: {[string]: any}, headers: {}?): string
+local function Post(method: string, data: {any}, headers: {}?): string | boolean
     if(not bot_token) then
         error("Bot token was not providen, please use tgbot.SetToken() to do so.")
     end
     return pcall(function()
-        local headers, body = network.RequestPost(`{TG_API}/bot{bot_token}/{method}`, headers or {"Content-Type: application/json"}, json.encode(data))
+        local _headers, body = network.RequestPost(`{TG_API}/bot{bot_token}/{method}`, headers or {"Content-Type: application/json"}, json.encode(data))
 
         return json.decode(body)
     end)
@@ -36,8 +38,9 @@ local function PostFile(method: string, data, files)
         error("Bot token was not providen, please use tgbot.SetToken() to do so.")
     end
     return pcall(function()
-        local headers, body = network.RequestPostForm(`{TG_API}/bot{bot_token}/{method}`,
-        data or {}, files or {})
+        local _headers, body = network.RequestPostForm(`{TG_API}/bot{bot_token}/{method}`,
+                                                      data or {},
+                                                      files or {})
 
         return json.decode(body)
     end)
@@ -66,11 +69,11 @@ end
 
 function tgbot.SetToken(token: string): ()
     bot_token = token
+    botname = tgbot.GetMe().username
 end
 
 function tgbot.GetMe(): string
-    local header, body = Get("getMe")
-    return body
+    return tgbot.Method("getMe")
 end
 
 function tgbot.SendMessage(chat_id: number, text: string, parse_mode: string?, reply_to: number?, replymarkup)
@@ -78,16 +81,19 @@ function tgbot.SendMessage(chat_id: number, text: string, parse_mode: string?, r
                           text = text,
                           parse_mode = parse_mode,
                           reply_parameters = if reply_to then {message_id = reply_to} else nil,
-                          reply_markup = replymarkup
+                          reply_markup = replymarkup,
+                          link_preview_options = {is_disabled = true}
     })
 end
 
-function tgbot.EditMessageText(chat_id: number, message_id: number, text: string, parse_mode: string?)
+function tgbot.EditMessageText(chat_id: number, message_id: number, text: string, parse_mode: string?, replymarkup)
     return tgbot.Method("editMessageText", {
                           chat_id = chat_id,
                           message_id = message_id,
                           text = text,
-                          parse_mode = parse_mode
+                          parse_mode = parse_mode,
+                          reply_markup = replymarkup,
+                          link_preview_options = {is_disabled = true}
     })
 end
 
@@ -122,9 +128,9 @@ function tgbot.StartLoop(): ()
 
     task.spawn(function()
         while task.wait(.1) do
-        pcall(function()
-            local update_id = tonumber(io.ReadFile("update.id") or 0)
-            local ok, ret = Post("getUpdates", {offset = update_id+1})
+        local error, msg = pcall(function()
+            local update_id = tonumber(io.ReadFile("update.id") or 10) or 0
+            local ok, ret = Post("getUpdates", {offset = update_id+1, timeout = 10, allowed_updates = {}})
 
             if not ok then
                 print(`[ERROR]: {ret}`)
@@ -132,19 +138,22 @@ function tgbot.StartLoop(): ()
             else
                 for i,v in ret.result do
                    if(update_id < v.update_id) then update_id = v.update_id end
-                   print(update_id)
 
                    if v.message then
-                   
-                   local arg = if v.message.text then v.message.text:split(" ")[1] else ""
-                       if callbacks[arg:split("@")[1]:split("/")[2]] then task.spawn(function() callbacks[arg:split("@")[1]:split("/")[2]].func(v) end); continue end
-                    end
-                    if all_callback then task.spawn(function() all_callback(v) end); continue end
+                       local arg = if v.message.text then v.message.text:split(" ")[1] else ""
+                       if callbacks[arg:split("@")[1]:split("/")[2]] then
+                           task.spawn(function() callbacks[arg:split("@")[1]:split("/")[2]].func(v) end)
+                           print(`[{color(`@{botname}`, color.GREEN)}][{color(update_id, 11)}][{os.date("%X")}][{color("/"..arg:split("@")[1]:split("/")[2], 45)}][{color(`@{v.message.from.username or v.message.from.id}`, color.GREEN)}]`)
+                           continue
+                       end
+                   end
+                   if all_callback then task.spawn(function() all_callback(v) end); print(`[{color("@"..botname, color.GREEN)}][{color(update_id, 11)}][{os.date("%X")}][{color(`@{v.message.from.username or v.message.from.id}`, color.GREEN)}]`); continue end
                 end
 
                 io.WriteFile("update.id", tostring(update_id))
             end
         end)
+        if not error then print(`[{color("TGBOT ERROR")}] {msg}`) end
         end
     end)
 
