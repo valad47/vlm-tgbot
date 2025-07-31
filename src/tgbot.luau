@@ -143,11 +143,11 @@ function tgbot.StartLoop(): ()
                        local arg = if v.message.text then v.message.text:split(" ")[1] else ""
                        if callbacks[arg:split("@")[1]:split("/")[2]] then
                            task.spawn(function() callbacks[arg:split("@")[1]:split("/")[2]].func(v) end)
-                           print(`[{color(`@{botname}`, color.GREEN)}][{color(update_id, 11)}][{os.date("%X")}][{color("/"..arg:split("@")[1]:split("/")[2], 45)}][{color(`@{v.message.from.username or v.message.from.id}`, color.GREEN)}]`)
+                           print(`[{color(`@{botname}`, color.GREEN)}][{color(update_id, 11)}][{os.date("%X")}][{color(`@{v.message.from.username or v.message.from.id}`, color.GREEN)}][{color("/"..arg:split("@")[1]:split("/")[2], 45)}]`)
                            continue
                        end
                    end
-                   if all_callback then task.spawn(function() all_callback(v) end); print(`[{color("@"..botname, color.GREEN)}][{color(update_id, 11)}][{os.date("%X")}][{color(`@{v.message.from.username or v.message.from.id}`, color.GREEN)}]`); continue end
+                   if all_callback then task.spawn(function() all_callback(v) end); print(`[{color("@"..botname, color.GREEN)}][{color(update_id, 11)}][{os.date("%X")}][{color(`@{if v.message then v.message.from.username or v.message.from.id else "unknown"}`, color.GREEN)}]`); continue end
                 end
 
                 io.WriteFile("update.id", tostring(update_id))
