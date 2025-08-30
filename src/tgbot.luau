@@ -49,7 +49,9 @@ end
 function tgbot.Method(method_name: string, body: {any}, headers)
     local ok, response = Post(method_name, body, headers)
     if not ok or not response.ok then
-        print(`[{response.error_code}] Error: {response.description or response}`)
+        print(`[{color(response.error_code, color.RED)}]`..
+              `[{color(tgbot.BotName, color.GREEN)}]`..
+              ` Error: {response.description or response}`)
     end
     return response.result
 end
@@ -69,7 +71,7 @@ end
 
 function tgbot.SetToken(token: string): ()
     bot_token = token
-    botname = tgbot.GetMe().username
+    tgbot.BotName = tgbot.GetMe().username
 end
 
 function tgbot.GetMe(): string
@@ -97,8 +99,8 @@ function tgbot.EditMessageText(chat_id: number, message_id: number, text: string
     })
 end
 
-function tgbot.SendPhoto(chat_id, photo)
-    return tgbot.MethodFile("sendPhoto", {chat_id = chat_id}, {photo = photo})
+function tgbot.SendPhoto(chat_id, photo, caption, parse_mode, penis, replymarkup)
+    return tgbot.MethodFile("sendPhoto", {chat_id = chat_id, caption = caption, parse_mode = parse_mode, reply_markup = json.encode(replymarkup or {})}, {photo = photo})
 end
 
 function tgbot.ApproveChatJoinRequest(chat_id: number, user_id: number)
@@ -126,34 +128,50 @@ function tgbot.StartLoop(): ()
     end
     Post("setMyCommands", {commands = list})
 
+
+    local update_id = 0
     task.spawn(function()
         while task.wait(.1) do
         local error, msg = pcall(function()
-            local update_id = tonumber(io.ReadFile("update.id") or 10) or 0
-            local ok, ret = Post("getUpdates", {offset = update_id+1, timeout = 10, allowed_updates = {}})
+            local ok, ret = Post("getUpdates", {offset = update_id+1, timeout = if task.__closest_time() > 0 then task.__closest_time() else 10, allowed_updates = {}})
 
-            if not ok then
-                print(`[ERROR]: {ret}`)
+            if not ok or not ret.ok then
+                print(`[{color("ERROR", color.RED)}][@{color(tgbot.BotName, color.GREEN)}]: {ret}`)
                 return
             else
                 for i,v in ret.result do
-                   if(update_id < v.update_id) then update_id = v.update_id end
+                   update_id = v.update_id
 
                    if v.message then
-                       local arg = if v.message.text then v.message.text:split(" ")[1] else ""
-                       if callbacks[arg:split("@")[1]:split("/")[2]] then
-                           task.spawn(function() callbacks[arg:split("@")[1]:split("/")[2]].func(v) end)
-                           print(`[{color(`@{botname}`, color.GREEN)}][{color(update_id, 11)}][{os.date("%X")}][{color(`@{v.message.from.username or v.message.from.id}`, color.GREEN)}][{color("/"..arg:split("@")[1]:split("/")[2], 45)}]`)
+                       local arg = (if v.message.text then string.split(v.message.text, " ")[1] else "")
+                                   :split("@")[1]
+                                   :split("/")[2]
+                       local cmd = callbacks[arg]
+                       if cmd then
+                           task.spawn(cmd.func, v)
+                           print(`[{color(`@{tgbot.BotName}`, color.GREEN)}]`..
+                                 `[{color(update_id, 11)}]`..
+                                 `[{os.date("%X")}]`..
+                                 `[{color(`@{v.message.from.username or v.message.from.id}`, color.GREEN)}]`..
+                                 `[{color("/"..arg, 45)}]`)
                            continue
                        end
                    end
-                   if all_callback then task.spawn(function() all_callback(v) end); print(`[{color("@"..botname, color.GREEN)}][{color(update_id, 11)}][{os.date("%X")}][{color(`@{if v.message then v.message.from.username or v.message.from.id else "unknown"}`, color.GREEN)}]`); continue end
+                   if all_callback then
+                       task.spawn(all_callback, v)
+                       print(`[{color("@"..tgbot.BotName, color.GREEN)}]`..
+                             `[{color(update_id, 11)}]`..
+                             `[{os.date("%X")}]`..
+                             `[{color(`@{if v.message then v.message.from.username or v.message.from.id else "unknown"}`, color.GREEN)}]`)
+                       continue
+                   end
                 end
-
-                io.WriteFile("update.id", tostring(update_id))
             end
         end)
-        if not error then print(`[{color("TGBOT ERROR")}] {msg}`) end
+        if not error then
+            print(`[{color("TGBOT ERROR", color.RED)}]`..
+                  `[@{color(tgbot.BotName, color.GREEN)}]`..
+                  ` {msg}`) end
         end
     end)
 
