@@ -5,6 +5,7 @@ local ipc = require_shared("ipc")
 local cbor = require_shared("cbor")
 local system = require_shared("system")
 local task = require_shared("task")
+local pprint = require_shared("pprint")
 
 local socket
 local epoll
