@@ -13,6 +13,8 @@ return {
            "io",
            "json",
            "task",
-           "color"
+           "color",
+           "ipc",
+           "signal"
        }
 }

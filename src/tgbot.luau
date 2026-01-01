@@ -7,6 +7,7 @@ local signal = require_shared("signal")
 
 require_shared("tgserver")
 local tgclient = require_shared("tgclient")
+local tgbot_methods = require_shared("tgbot_methods")
 
 local tgbot = {}
 local events = {}
@@ -56,6 +57,27 @@ local function PostFile(method: string, data, files)
     end)
 end
 
+setmetatable(tgbot, {
+    __index = function(t, key)
+        local ret = rawget(tgbot, key)
+        if not ret then
+            local keys = tgbot_methods[key]
+            if not keys return end
+            ret = function(...)
+                local args = {...}
+                if typeof(args[1]) == "table" then
+                    return tgbot.Method(key, args[1])
+                end
+                local key_map = {}
+                for i,v in keys do
+                    key_map[v] = args[i]
+                end
+                return tgbot.Method(key, key_map)
+            end
+        end
+    end
+})
+
 function tgbot.Method(method_name: string, body: {any}, headers)
     local ok, response = Post(method_name, body, headers)
     if not ok or not response.ok then
@@ -98,26 +120,8 @@ function tgbot.SendMessage(chat_id: number, text: string, parse_mode: string?, r
     })
 end
 
-function tgbot.EditMessageText(chat_id: number, message_id: number, text: string, parse_mode: string?, replymarkup)
-    return tgbot.Method("editMessageText", {
-                          chat_id = chat_id,
-                          message_id = message_id,
-                          text = text,
-                          parse_mode = parse_mode,
-                          reply_markup = replymarkup,
-                          link_preview_options = {is_disabled = true}
-    })
-end
-
 function tgbot.SendPhoto(chat_id, photo, caption, parse_mode, penis, replymarkup)
     return tgbot.MethodFile("sendPhoto", {chat_id = chat_id, caption = caption, parse_mode = parse_mode, reply_markup = json.encode(replymarkup or {})}, {photo = photo})
-end
-
-function tgbot.ApproveChatJoinRequest(chat_id: number, user_id: number)
-    return tgbot.Method("approveChatJoinRequest", {
-                              chat_id = chat_id,
-                              user_id = user_id
-    })
 end
 
 function tgbot.AddCommand(command: string, func: (message: {}) -> (), desc: string?)
