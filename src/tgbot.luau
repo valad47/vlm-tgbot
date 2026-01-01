@@ -26,7 +26,10 @@ local all_callback
 local botname
 
 local function check()
-    bot_token = bot_token or io.ReadFile(".token")
+    if not bot_token then
+        bot_token = io.ReadFile(".token")
+        tgbot.BotName = tgbot.GetMe().username
+    end
     if(not bot_token) then
         error("Bot token was not providen, please use tgbot.SetToken() or fill in [.token] file to do so.")
     end
@@ -135,15 +138,13 @@ end
 function tgbot.StartLoop(): ()
     print("Starting loop")
 
-    tgclient.Init(bot_token, botname)
-
     Post("deleteMyCommands", {})
     local list = {}
     for i, v in callbacks do
        table.insert(list, {command = i, description = v.desc or i})
     end
     Post("setMyCommands", {commands = list})
-
+    tgclient.Init(bot_token, tgbot.BotName)
 
     local update_id = 0
     task.spawn(function()
@@ -182,6 +183,7 @@ function tgbot.StartLoop(): ()
                        continue
                    end
                    for event, data in v do
+                       if event == "update_id" then continue end
                        if events[event] then events[event]:Fire(data) end
                        print(`[{color("@"..tgbot.BotName, color.GREEN)}]`..
                              `[{color(update_id, 11)}]`..
