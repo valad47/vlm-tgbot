@@ -3,11 +3,20 @@ local json = require_shared("json")
 local task = require_shared("task")
 local io = require_shared("io")
 local color = require_shared("color")
-local tgbot = {}
+local signal = require_shared("signal")
 
-function tgbot.__set_task(new_task)
-    task = new_task
-end
+require_shared("tgserver")
+local tgclient = require_shared("tgclient")
+
+local tgbot = {}
+local events = {}
+
+tgbot.Events = setmetatable({}, {
+    __index = function(t, key)
+        events[key] = events[key] or signal.new()
+        return events[key]
+    end
+})
 
 local bot_token
 local TG_API = "https://api.telegram.org"
@@ -15,17 +24,20 @@ local callbacks = {}
 local all_callback
 local botname
 
-local function Get(method: string): string | boolean
+local function check()
+    bot_token = bot_token or io.ReadFile(".token")
     if(not bot_token) then
-        error("Bot token was not providen, please use tgbot.SetToken() to do so.")
+        error("Bot token was not providen, please use tgbot.SetToken() or fill in [.token] file to do so.")
     end
+end
+
+local function Get(method: string): string | boolean
+    check()
     return pcall(network.RequestGet, `{TG_API}/bot{bot_token}/{method}`, {"Content-Type: application/json"})
 end
 
 local function Post(method: string, data: {any}, headers: {}?): string | boolean
-    if(not bot_token) then
-        error("Bot token was not providen, please use tgbot.SetToken() to do so.")
-    end
+    check()
     return pcall(function()
         local _headers, body = network.RequestPost(`{TG_API}/bot{bot_token}/{method}`, headers or {"Content-Type: application/json"}, json.encode(data))
 
@@ -34,9 +46,7 @@ local function Post(method: string, data: {any}, headers: {}?): string | boolean
 end
 
 local function PostFile(method: string, data, files)
-    if(not bot_token) then
-        error("Bot token was not providen, please use tgbot.SetToken() to do so.")
-    end
+    check()
     return pcall(function()
         local _headers, body = network.RequestPostForm(`{TG_API}/bot{bot_token}/{method}`,
                                                       data or {},
@@ -121,6 +131,8 @@ end
 function tgbot.StartLoop(): ()
     print("Starting loop")
 
+    tgclient.Init(bot_token, botname)
+
     Post("deleteMyCommands", {})
     local list = {}
     for i, v in callbacks do
@@ -162,6 +174,15 @@ function tgbot.StartLoop(): ()
                        print(`[{color("@"..tgbot.BotName, color.GREEN)}]`..
                              `[{color(update_id, 11)}]`..
                              `[{os.date("%X")}]`..
+                             `[{color(`@{if v.message then v.message.from.username or v.message.from.id else "unknown"}`, color.GREEN)}]`)
+                       continue
+                   end
+                   for event, data in v do
+                       if events[event] then events[event]:Fire(data)
+                       print(`[{color("@"..tgbot.BotName, color.GREEN)}]`..
+                             `[{color(update_id, 11)}]`..
+                             `[{os.date("%X")}]`..
+                             `[{color(event, color.YELLOW)}]`..
                              `[{color(`@{if v.message then v.message.from.username or v.message.from.id else "unknown"}`, color.GREEN)}]`)
                        continue
                    end
