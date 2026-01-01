@@ -5,6 +5,7 @@ return {
            "src/tgbot_methods.luau",
            "src/tgclient.luau",
            "src/tgserver.luau",
+           "src/tgmethods/tgm_methods.luau",
            "src/tgmethods/tgm_init.luau",
            "src/tgmethods/tgm_root.luau",
        },

@@ -5,7 +5,6 @@ local ipc = require_shared("ipc")
 local cbor = require_shared("cbor")
 local system = require_shared("system")
 local task = require_shared("task")
-local pprint = require_shared("pprint")
 
 local socket
 local epoll
@@ -17,10 +16,7 @@ local database = {
       clients = {},
       clients_data = {},
       root_fd = nil,
-      methods = {
-              connect = {method = require("tgm_init")},
-              root = {method = require("tgm_root")},
-      }
+      methods = require("tgm_methods")
 }
 
 local function input_handler(client)
