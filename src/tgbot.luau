@@ -62,7 +62,7 @@ setmetatable(tgbot, {
         local ret = rawget(tgbot, key)
         if not ret then
             local keys = tgbot_methods[key]
-            if not keys return end
+            if not keys then return end
             ret = function(...)
                 local args = {...}
                 if typeof(args[1]) == "table" then
@@ -182,13 +182,12 @@ function tgbot.StartLoop(): ()
                        continue
                    end
                    for event, data in v do
-                       if events[event] then events[event]:Fire(data)
+                       if events[event] then events[event]:Fire(data) end
                        print(`[{color("@"..tgbot.BotName, color.GREEN)}]`..
                              `[{color(update_id, 11)}]`..
                              `[{os.date("%X")}]`..
                              `[{color(event, color.YELLOW)}]`..
                              `[{color(`@{if v.message then v.message.from.username or v.message.from.id else "unknown"}`, color.GREEN)}]`)
-                       continue
                    end
                 end
             end
