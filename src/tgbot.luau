@@ -67,7 +67,7 @@ setmetatable(tgbot, {
         if not ret then
             local keys = tgbot_methods[key]
             if not keys then return end
-            ret = function(...)
+            return function(...)
                 local args = {...}
                 if typeof(args[1]) == "table" then
                     return tgbot.Method(key, args[1])
