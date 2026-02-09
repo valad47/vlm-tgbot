@@ -29,7 +29,7 @@ local function input_handler(client)
           ok, data = pcall(cbor.decode, data)
     pprint(ok, data)
     local function asert(ok, code, err)
-        print("Asserting", ok, code, err)
+        --print("Asserting", ok, code, err)
         if ok then return end
         ipc.server.send(client, cbor.encode({ok = false, code = code, error = err}));
         error(err)
