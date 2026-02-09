@@ -37,7 +37,8 @@ end
 
 local function Get(method: string): string | boolean
     check()
-    return pcall(network.RequestGet, `{TG_API}/bot{bot_token}/{method}`, {"Content-Type: application/json"})
+
+return pcall(network.RequestGet, `{TG_API}/bot{bot_token}/{method}`, {"Content-Type: application/json"})
 end
 
 local function Post(method: string, data: {any}, headers: {}?): string | boolean
@@ -184,7 +185,7 @@ function tgbot.StartLoop(): ()
                    end
                    for event, data in v do
                        if event == "update_id" then continue end
-                       if events[event] then events[event]:Fire(data) end
+                       if events[event] then events[event]:Fire(data, update_id) end
                        print(`[{color("@"..tgbot.BotName, color.GREEN)}]`..
                              `[{color(update_id, 11)}]`..
                              `[{os.date("%X")}]`..
